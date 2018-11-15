@@ -26,7 +26,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>config-cc</artifactId>
-  <name>Java Chassis::Foundations::Config CC</name>
+  <name>Java Chassis::Dynamic Config::Config CC</name>
 
   <dependencies>
     <dependency>

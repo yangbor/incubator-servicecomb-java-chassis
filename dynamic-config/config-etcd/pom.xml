@@ -11,7 +11,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>config-etcd</artifactId>
-  <name>Java Chassis::DynamicConfig::Config Etcd</name>
+  <name>Java Chassis::Dynamic Config::Etcd</name>
 
   <dependencies>
     <dependency>
