@@ -17,49 +17,27 @@
 
 package org.apache.servicecomb.config.archaius.sources;
 
-import static com.netflix.config.WatchedUpdateResult.createIncremental;
-import static org.apache.servicecomb.config.client.ConfigurationAction.CREATE;
-import static org.apache.servicecomb.config.client.ConfigurationAction.DELETE;
-import static org.apache.servicecomb.config.client.ConfigurationAction.SET;
-
-import java.util.List;
+import java.net.URI;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-import javax.validation.constraints.NotNull;
 
 import org.apache.commons.configuration.Configuration;
-import org.apache.servicecomb.config.ConfigMapping;
-import org.apache.servicecomb.config.client.ApolloClient;
-import org.apache.servicecomb.config.client.ApolloConfig;
-import org.apache.servicecomb.config.client.ConfigurationAction;
 import org.apache.servicecomb.config.spi.ConfigCenterConfigurationSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.boon.etcd.ClientBuilder;
+import org.boon.etcd.Etcd;
 
-import com.google.common.collect.ImmutableMap;
 import com.netflix.config.WatchedUpdateListener;
-import com.netflix.config.WatchedUpdateResult;
+import com.netflix.config.source.EtcdConfigurationSource;
 
-public class EtcdConfigurationSourceImpl implements ConfigCenterConfigurationSource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ConfigCenterConfigurationSource.class);
+public class EtcdConfigurationSourceImpl
+    implements ConfigCenterConfigurationSource
+{
+  private static final String ETCD_CONFIG_URL_KEY = "etcd.config.serverUri";
 
-  private final Map<String, Object> valueCache = new ConcurrentHashMap<>();
-
-  private List<WatchedUpdateListener> listeners = new CopyOnWriteArrayList<>();
-
-  private static final String APOLLO_CONFIG_URL_KEY = "apollo.config.serverUri";
-
-  public EtcdConfigurationSourceImpl() {
-  }
-
-  private final UpdateHandler updateHandler = new UpdateHandler();
+  private EtcdConfigurationSource etcdSource = null;
 
   @Override
   public boolean isValidSource(Configuration localConfiguration) {
-    if (localConfiguration.getProperty(APOLLO_CONFIG_URL_KEY) == null) {
-      LOGGER.warn("Apollo configuration source is not configured!");
+    if (localConfiguration.getString(ETCD_CONFIG_URL_KEY, "").isEmpty()) {
       return false;
     }
     return true;
@@ -67,74 +45,24 @@ public class EtcdConfigurationSourceImpl implements ConfigCenterConfigurationSou
 
   @Override
   public void init(Configuration localConfiguration) {
-    ApolloConfig.setConcurrentCompositeConfiguration(localConfiguration);
-    init();
-  }
-
-  private void init() {
-    ApolloClient apolloClient = new ApolloClient(updateHandler);
-    apolloClient.refreshApolloConfig();
+    Etcd etcd = new ClientBuilder()
+        .hosts(URI.create(localConfiguration.getString(ETCD_CONFIG_URL_KEY, "http://localhost:2379")))
+        .timeOutInMilliseconds(1000).createClient();
+    etcdSource = new EtcdConfigurationSource(etcd, "/SCB-CONFIG/");
   }
 
   @Override
-  public void addUpdateListener(@NotNull WatchedUpdateListener watchedUpdateListener) {
-    listeners.add(watchedUpdateListener);
+  public void addUpdateListener(WatchedUpdateListener l) {
+    etcdSource.addUpdateListener(l);
   }
 
   @Override
-  public void removeUpdateListener(@NotNull WatchedUpdateListener watchedUpdateListener) {
-    listeners.remove(watchedUpdateListener);
-  }
-
-  private void updateConfiguration(WatchedUpdateResult result) {
-    for (WatchedUpdateListener l : listeners) {
-      try {
-        l.updateConfiguration(result);
-      } catch (Throwable ex) {
-        LOGGER.error("Error in invoking WatchedUpdateListener", ex);
-      }
-    }
+  public void removeUpdateListener(WatchedUpdateListener l) {
+    etcdSource.removeUpdateListener(l);
   }
 
   @Override
   public Map<String, Object> getCurrentData() throws Exception {
-    return valueCache;
-  }
-
-  public List<WatchedUpdateListener> getCurrentListeners() {
-    return listeners;
-  }
-
-  public class UpdateHandler {
-    public void handle(ConfigurationAction action, Map<String, Object> config) {
-      if (config == null || config.isEmpty()) {
-        return;
-      }
-      Map<String, Object> configuration = ConfigMapping.getConvertedMap(config);
-      if (CREATE.equals(action)) {
-        valueCache.putAll(configuration);
-
-        updateConfiguration(createIncremental(ImmutableMap.copyOf(configuration),
-            null,
-            null));
-      } else if (SET.equals(action)) {
-        valueCache.putAll(configuration);
-
-        updateConfiguration(createIncremental(null,
-            ImmutableMap.copyOf(configuration),
-            null));
-      } else if (DELETE.equals(action)) {
-        for (String itemKey : configuration.keySet()) {
-          valueCache.remove(itemKey);
-        }
-        updateConfiguration(createIncremental(null,
-            null,
-            ImmutableMap.copyOf(configuration)));
-      } else {
-        LOGGER.error("action: {} is invalid.", action.name());
-        return;
-      }
-      LOGGER.warn("Config value cache changed: action:{}; item:{}", action.name(), configuration.keySet());
-    }
+    return etcdSource.getCurrentData();
   }
 }

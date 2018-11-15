@@ -436,13 +436,23 @@
       <dependency>
         <groupId>com.netflix.archaius</groupId>
         <artifactId>archaius-core</artifactId>
-        <version>0.7.3</version>
+        <version>0.7.6</version>
         <exclusions>
           <exclusion>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>annotations</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.netflix.archaius</groupId>
+        <artifactId>archius-etcd</artifactId>
+        <version>0.7.6</version>
+      </dependency>
+      <dependency>
+        <groupId>io.fastjson</groupId>
+        <artifactId>etcd-client</artifactId>
+        <version>0.33</version>
       </dependency>
       <dependency>
         <groupId>com.google.code.findbugs</groupId>

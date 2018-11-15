@@ -34,7 +34,7 @@
   <modules>
     <module>config-apollo</module>
     <module>config-cc</module>
-    <module>../config-etcd</module>
+    <module>config-etcd</module>
   </modules>
 
 </project>
