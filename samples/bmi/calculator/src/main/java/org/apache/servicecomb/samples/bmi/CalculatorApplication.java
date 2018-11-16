@@ -21,11 +21,20 @@ import org.apache.servicecomb.springboot.starter.provider.EnableServiceComb;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+import com.netflix.config.DynamicPropertyFactory;
+import com.netflix.config.DynamicStringProperty;
+
 @SpringBootApplication
 @EnableServiceComb
 public class CalculatorApplication {
 
   public static void main(String[] args) {
+
+    DynamicPropertyFactory factory = DynamicPropertyFactory.getInstance();
+    DynamicStringProperty prop = factory.getStringProperty("servicecomb.demo", "foobar");
+    prop.addCallback(() -> {
+      System.out.println(prop.get());
+    });
     SpringApplication.run(CalculatorApplication.class, args);
   }
 }

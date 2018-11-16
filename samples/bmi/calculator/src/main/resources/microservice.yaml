@@ -32,3 +32,6 @@ servicecomb:
     chain:
       Provider:
         default: bizkeeper-provider
+etcd:
+  config:
+    serverUri: http://127.0.0.1:2379
