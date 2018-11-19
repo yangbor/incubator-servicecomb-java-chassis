@@ -31,7 +31,13 @@ servicecomb:
   handler:
     chain:
       Provider:
-        default: bizkeeper-provider
+        default: qps-flowcontrol-provider,bizkeeper-provider
+  flowcontrol:
+    Provider:
+      qps:
+        enabled: true
+        limit:
+          calculator: 2
 etcd:
   config:
     serverUri: http://127.0.0.1:2379

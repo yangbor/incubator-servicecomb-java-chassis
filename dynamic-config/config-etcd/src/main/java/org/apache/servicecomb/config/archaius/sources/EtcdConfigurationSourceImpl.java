@@ -29,12 +29,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.servicecomb.config.ConfigMapping;
+import org.apache.servicecomb.config.client.ConfigCenterConfig;
 import org.apache.servicecomb.config.spi.ConfigCenterConfigurationSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.netflix.config.ConcurrentCompositeConfiguration;
 import com.netflix.config.WatchedUpdateListener;
 import com.netflix.config.WatchedUpdateResult;
 
@@ -53,6 +55,12 @@ public class EtcdConfigurationSourceImpl implements ConfigCenterConfigurationSou
 
   private final Map<String, Object> valueCache = Maps.newConcurrentMap();
   private final List<WatchedUpdateListener> listeners = new CopyOnWriteArrayList<WatchedUpdateListener>();
+
+  private static final ConfigCenterConfig CONFIG_CENTER_CONFIG = ConfigCenterConfig.INSTANCE;
+
+
+  private String serviceName;
+  private ByteSequence prefix;
 
   @Override
   public void addUpdateListener(WatchedUpdateListener l) {
@@ -80,12 +88,14 @@ public class EtcdConfigurationSourceImpl implements ConfigCenterConfigurationSou
 
   @Override
   public void init(Configuration localConfiguration) {
+    ConfigCenterConfig.setConcurrentCompositeConfiguration((ConcurrentCompositeConfiguration)localConfiguration);
+    serviceName = CONFIG_CENTER_CONFIG.getServiceName();
+    prefix = ByteSequence.from(serviceName, UTF_8);
     String endpoint = localConfiguration.getString(ETCD_CONFIG_URL_KEY);
     client = Client.builder().endpoints(endpoint).build();
 
     syncLocalConfig(localConfiguration);
 
-    ByteSequence prefix = ByteSequence.from("", UTF_8);
 
     Watch.Listener listener = Watch.listener(response -> {
       Map<String, Object> createConfigs = new HashMap<>();
@@ -99,7 +109,7 @@ public class EtcdConfigurationSourceImpl implements ConfigCenterConfigurationSou
         String value =Optional.ofNullable(kv.getValue())
             .map(bs -> bs.toString(UTF_8))
             .orElse("");
-
+        key = key.replace(serviceName, "");
         LOGGER.info("type={}, key={}, value={}",
             event.getEventType(),key, value);
         switch (event.getEventType()){
@@ -146,10 +156,12 @@ public class EtcdConfigurationSourceImpl implements ConfigCenterConfigurationSou
       String key = keys.next();
       String prop = localConfig.getProperty(key).toString();
       KV kvClient = client.getKVClient();
-      try {
-        kvClient.put(ByteSequence.from(key, UTF_8), ByteSequence.from(prop, UTF_8)).get();
-      }catch (Exception e){
-        LOGGER.info("Exception putting key {}, e: {}", key, e);
+      if (!key.isEmpty()) {
+        try {
+          kvClient.put(ByteSequence.from(serviceName+key, UTF_8), ByteSequence.from(prop, UTF_8)).get();
+        } catch (Exception e) {
+          LOGGER.info("Exception putting key {}, e: {}", key, e);
+        }
       }
     }
   }
